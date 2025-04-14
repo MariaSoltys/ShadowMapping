@@ -28,7 +28,7 @@ class GraphicPipeline:
 
 
     def VertexShader(self, vertex, data) :
-        outputVertex = np.zeros((14))
+        outputVertex = np.zeros((17))
 
         x = vertex[0]
         y = vertex[1]
@@ -57,6 +57,10 @@ class GraphicPipeline:
 
         outputVertex[12] = vertex[6]
         outputVertex[13] = vertex[7]
+
+        outputVertex[14] = x
+        outputVertex[15] = y
+        outputVertex[16] = z
 
         return outputVertex
 
@@ -164,33 +168,48 @@ class GraphicPipeline:
 
         fragment.output = color
         ####################################################################
-        fragPos = data['cameraPosition'] - V  #since V = camera - fragment
+        # fragPos = data['cameraPosition'] - V  #since V = camera - fragment
+        fragPos = fragment.interpolated_data[11:14]
+
         vec = np.append(fragPos, 1.0)
         light_space_pos = np.matmul(data['lightProjMatrix'], np.matmul(data['lightViewMatrix'], vec))
         light_space_pos /= light_space_pos[3]
-        u = (light_space_pos[0] * 0.5 + 0.5)
-        v = (light_space_pos[1] * 0.5 + 0.5)
+
+        u = np.clip(light_space_pos[0] * 0.5 + 0.5, 0, 1)
+        v = np.clip(light_space_pos[1] * 0.5 + 0.5, 0, 1)
         shadow_depth = light_space_pos[2]
+
         height, width = data['shadowMap'].shape
         x = int(u * width)
         y = int((1 - v) * height)
+
         shadow = 0.0
         bias = 0.001
+
         if 0 <= x < width and 0 <= y < height:
             closest_depth = data['shadowMap'][y, x]
             if shadow_depth - bias > closest_depth:
                 shadow = 1.0
 
-        color *= (1.0 - 0.5 * shadow) #applying shadow to the color
+        color *= (1.0 - 0.9 * shadow)
 
         #for debuging
         if shadow > 0.0:
             print("In shadow:", shadow)
+
+        if 0 <= x < width and 0 <= y < height:
+            closest_depth = data['shadowMap'][y, x]
+            print(f"Frag depth: {shadow_depth:.5f}, Closest: {closest_depth:.5f}")
+            if shadow_depth - bias > closest_depth:
+                shadow = 1.0
+
+        print(f"Light-space UV: ({u:.2f}, {v:.2f}), Pixel: ({x}, {y})")
         ####################################################################
 
     def draw(self, vertices, triangles, data, shade=True):
         #Calling vertex shader
-        self.newVertices = np.zeros((vertices.shape[0], 14))
+        # self.newVertices = np.zeros((vertices.shape[0], 14))
+        self.newVertices = np.zeros((vertices.shape[0], 17))
 
         for i in range(vertices.shape[0]) :
             self.newVertices[i] = self.VertexShader(vertices[i],data)

@@ -104,6 +104,11 @@ shadowMap = shadowPipeline.depthBuffer
 data['lightViewMatrix'] = lightViewMatrix
 data['lightProjMatrix'] = lightProjMatrix
 data['shadowMap'] = shadowMap
+#debug
+import matplotlib.pyplot as plt
+plt.imshow(shadowMap, cmap='gray')
+plt.title("Shadow Map from Light View")
+plt.show()
 ###################################################################
 
 pipeline.draw(vertices, triangles, data)
