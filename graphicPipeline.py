@@ -58,9 +58,10 @@ class GraphicPipeline:
         outputVertex[12] = vertex[6]
         outputVertex[13] = vertex[7]
 
-        outputVertex[14] = x
-        outputVertex[15] = y
-        outputVertex[16] = z
+        outputVertex[14] = vertex[0]
+        outputVertex[15] = vertex[1]
+        outputVertex[16] = vertex[2]
+
 
         return outputVertex
 
@@ -128,14 +129,16 @@ class GraphicPipeline:
                     #one_over_z = lambda0 * 1/v0[2] + lambda1 * 1/v1[2] + lambda2 * 1/v2[2]
                     #z = 1/one_over_z
                     
-                    z = lambda0 * v0[2] + lambda1 * v1[2] + lambda2 * v2[2]
+                    z_ndc = lambda0 * v0[2] + lambda1 * v1[2] + lambda2 * v2[2]
+                    z = z_ndc * 0.5 + 0.5  
+
 
                     p = np.array([x,y,z])
                     
                     
                     l = v0.shape[0]
                     #interpolating
-                    interpolated_data = v0[3:l] * lambda0 + v1[3:l] * lambda1 + v2[3:l] * lambda2
+                    interpolated_data = lambda0 * v0[3:] + lambda1 * v1[3:] + lambda2 * v2[3:]
                     
                     #Emiting Fragment
                     fragments.append(Fragment(i,j,z, interpolated_data))
@@ -164,47 +167,68 @@ class GraphicPipeline:
         texture = sample(data['texture'], fragment.interpolated_data[9], fragment.interpolated_data[10])
 
 
-        color = np.array([phong,phong,phong]) * texture
+        color = np.array([phong,phong,phong]) #* texture
 
-        fragment.output = color
+        
         ####################################################################
         # fragPos = data['cameraPosition'] - V  #since V = camera - fragment
         fragPos = fragment.interpolated_data[11:14]
+        vec = np.append(fragPos, 1.0).reshape((4, 1))
 
-        vec = np.append(fragPos, 1.0)
         light_space_pos = np.matmul(data['lightProjMatrix'], np.matmul(data['lightViewMatrix'], vec))
         light_space_pos /= light_space_pos[3]
 
-        u = np.clip(light_space_pos[0] * 0.5 + 0.5, 0, 1)
-        v = np.clip(light_space_pos[1] * 0.5 + 0.5, 0, 1)
-        shadow_depth = light_space_pos[2]
+        u = np.clip(light_space_pos[0, 0] * 0.5 + 0.5, 0, 1)
+        v = np.clip(light_space_pos[1, 0] * 0.5 + 0.5, 0, 1)
+        shadow_depth = light_space_pos[2, 0] * 0.5 + 0.5
+
 
         height, width = data['shadowMap'].shape
         x = int(u * width)
         y = int((1 - v) * height)
 
         shadow = 0.0
-        bias = 0.001
+        bias = 0.0002
+
 
         if 0 <= x < width and 0 <= y < height:
             closest_depth = data['shadowMap'][y, x]
+            closest_depth = np.clip(closest_depth, 0.0, 1.0)
             if shadow_depth - bias > closest_depth:
                 shadow = 1.0
+                print("cd: ", closest_depth)
+                print("sd: ", shadow_depth)
+            #shadow = 1.0
 
-        color *= (1.0 - 0.9 * shadow)
+
+        color *= (1.0 - 0.5*shadow)
 
         #for debuging
         if shadow > 0.0:
             print("In shadow:", shadow)
 
-        if 0 <= x < width and 0 <= y < height:
-            closest_depth = data['shadowMap'][y, x]
-            print(f"Frag depth: {shadow_depth:.5f}, Closest: {closest_depth:.5f}")
-            if shadow_depth - bias > closest_depth:
-                shadow = 1.0
+        # if 0 <= x < width and 0 <= y < height:
+        #     closest_depth = data['shadowMap'][y, x]
+        #     if shadow_depth - bias > closest_depth:
+        #         shadow = 1.0
+        #     if shadow > 0.0:
+        #         print(f"SHADOW! Frag: {shadow_depth:.5f}, Closest: {closest_depth:.5f}")
+        #     else:
+        #         print() #f"NO SHADOW! Frag: {shadow_depth:.5f}, Closest: {closest_depth:.5f}")
+        # else:
+        #     print(f"UV out of bounds: ({u:.2f}, {v:.2f})")
 
-        print(f"Light-space UV: ({u:.2f}, {v:.2f}), Pixel: ({x}, {y})")
+
+
+        # if 0 <= x < width and 0 <= y < height:
+        #     closest_depth = data['shadowMap'][y, x]
+        #     print(f"Frag depth: {shadow_depth:.5f}, Closest: {closest_depth:.5f}")
+        #     if shadow_depth - bias > closest_depth:
+        #         shadow = 1.0
+
+        # print(f"Light-space UV: ({u:.2f}, {v:.2f}), Pixel: ({x}, {y})")
         ####################################################################
+        fragment.output = color
 
     def draw(self, vertices, triangles, data, shade=True):
         #Calling vertex shader

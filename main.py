@@ -54,7 +54,7 @@ proj = Projection(nearPlane ,farPlane,fov, aspectRatio)
 
 ########################################################### 2nd chunck
 lightNearPlane = 0.1
-lightFarPlane = 50.0
+lightFarPlane = 20.0
 #fov = 1.91986
 lightFov = 1.047
 lightProj = Projection(lightNearPlane, lightFarPlane, lightFov, aspectRatio)
@@ -109,6 +109,8 @@ import matplotlib.pyplot as plt
 plt.imshow(shadowMap, cmap='gray')
 plt.title("Shadow Map from Light View")
 plt.show()
+
+print("Shadow map min/max:", np.min(shadowMap), np.max(shadowMap))
 ###################################################################
 
 pipeline.draw(vertices, triangles, data)
