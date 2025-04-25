@@ -1,5 +1,5 @@
 # ShadowMapping
-This project is a Python-based software rasterizer that implements **basic shadow mapping** using custom rendering logic and fragment shaders.
+This project is a Python-based software rasterizer that implements shadow mapping using custom rendering logic and fragment shaders.
 
 ## Project Structure
 ```
