@@ -58,14 +58,15 @@ class GraphicPipeline:
         outputVertex[12] = vertex[6]
         outputVertex[13] = vertex[7]
 
-        outputVertex[14] = x
-        outputVertex[15] = y
-        outputVertex[16] = z
+        outputVertex[14] = vertex[0]
+        outputVertex[15] = vertex[1]
+        outputVertex[16] = vertex[2]
+
 
         return outputVertex
 
 
-    def Rasterizer(self, v0, v1, v2) :
+    def Rasterizer(self, v0, v1, v2, data) :
         fragments = []
 
         #culling back face
@@ -102,10 +103,8 @@ class GraphicPipeline:
         #cast bounding box to int
         A = A.astype(int)
         B = B.astype(int)
-        #Compensate rounding of int cast
         B = B + 1
 
-        #for each pixel in the bounding box
         for j in range(A[1], B[1]) : 
            for i in range(A[0], B[0]) :
                 x = (i+0.5)/self.width * 2.0 - 1 
@@ -117,25 +116,24 @@ class GraphicPipeline:
                 area1 = edgeSide(p,v1,v2)
                 area2 = edgeSide(p,v2,v0)
 
-                #test if p is inside the triangle
                 if (area0 >= 0 and area1 >= 0 and area2 >= 0) : 
                     
-                    #Computing 2d barricentric coordinates
                     lambda0 = area1/area
                     lambda1 = area2/area
                     lambda2 = area0/area
-                    
-                    #one_over_z = lambda0 * 1/v0[2] + lambda1 * 1/v1[2] + lambda2 * 1/v2[2]
-                    #z = 1/one_over_z
-                    
-                    z = lambda0 * v0[2] + lambda1 * v1[2] + lambda2 * v2[2]
+
+                    z_ndc = lambda0 * v0[2] + lambda1 * v1[2] + lambda2 * v2[2]
+                    n = data['lightNearPlane']
+                    f = data['lightFarPlane']
+                    z_linear = n * f / (f - z_ndc * (f - n))
+                    z = z_linear / f
 
                     p = np.array([x,y,z])
                     
                     
                     l = v0.shape[0]
                     #interpolating
-                    interpolated_data = v0[3:l] * lambda0 + v1[3:l] * lambda1 + v2[3:l] * lambda2
+                    interpolated_data = lambda0 * v0[3:] + lambda1 * v1[3:] + lambda2 * v2[3:]
                     
                     #Emiting Fragment
                     fragments.append(Fragment(i,j,z, interpolated_data))
@@ -166,63 +164,67 @@ class GraphicPipeline:
 
         color = np.array([phong,phong,phong]) * texture
 
-        fragment.output = color
-        ####################################################################
-        # fragPos = data['cameraPosition'] - V  #since V = camera - fragment
         fragPos = fragment.interpolated_data[11:14]
+        vec = np.append(fragPos, 1.0).reshape((4, 1))
 
-        vec = np.append(fragPos, 1.0)
         light_space_pos = np.matmul(data['lightProjMatrix'], np.matmul(data['lightViewMatrix'], vec))
         light_space_pos /= light_space_pos[3]
 
-        u = np.clip(light_space_pos[0] * 0.5 + 0.5, 0, 1)
-        v = np.clip(light_space_pos[1] * 0.5 + 0.5, 0, 1)
-        shadow_depth = light_space_pos[2]
+        u = np.clip(light_space_pos[0, 0] * 0.5 + 0.5, 0, 1)
+        v = np.clip(light_space_pos[1, 0] * 0.5 + 0.5, 0, 1)
+        z_ndc = light_space_pos[2, 0]
+        n = data['lightNearPlane']
+        f = data['lightFarPlane']
+        z_linear = n * f / (f - z_ndc * (f - n))
+        shadow_depth = z_linear / f
 
         height, width = data['shadowMap'].shape
         x = int(u * width)
         y = int((1 - v) * height)
 
         shadow = 0.0
-        bias = 0.001
+        bias = 0.005
+        depthMap = data['shadowMap']
 
         if 0 <= x < width and 0 <= y < height:
             closest_depth = data['shadowMap'][y, x]
+            closest_depth = np.clip(closest_depth, 0.0, 1.0)
+
             if shadow_depth - bias > closest_depth:
                 shadow = 1.0
 
-        color *= (1.0 - 0.9 * shadow)
+        #PCF filtering 
+        shadow = 0
+        samples = 3
+        count = 0
+        for dy in range(-1, 2):
+            for dx in range(-1, 2):
+                sx = int(x + dx)
+                sy = int(y + dy)
+                if 0 <= sx < width and 0 <= sy < height:
+                    closest = depthMap[sy, sx]
+                    if shadow_depth - bias > closest:
+                        shadow += 1
+                    count += 1
+        shadow /= count
 
-        #for debuging
-        if shadow > 0.0:
-            print("In shadow:", shadow)
-
-        if 0 <= x < width and 0 <= y < height:
-            closest_depth = data['shadowMap'][y, x]
-            print(f"Frag depth: {shadow_depth:.5f}, Closest: {closest_depth:.5f}")
-            if shadow_depth - bias > closest_depth:
-                shadow = 1.0
-
-        print(f"Light-space UV: ({u:.2f}, {v:.2f}), Pixel: ({x}, {y})")
-        ####################################################################
+        color *= (1.0 - 0.5 * shadow)
+        fragment.output = color
 
     def draw(self, vertices, triangles, data, shade=True):
         #Calling vertex shader
-        # self.newVertices = np.zeros((vertices.shape[0], 14))
         self.newVertices = np.zeros((vertices.shape[0], 17))
-
         for i in range(vertices.shape[0]) :
             self.newVertices[i] = self.VertexShader(vertices[i],data)
         
         fragments = []
         #Calling Rasterizer
         for i in triangles :
-            fragments.extend(self.Rasterizer(self.newVertices[i[0]], self.newVertices[i[1]], self.newVertices[i[2]]))
+            fragments.extend(self.Rasterizer(self.newVertices[i[0]], self.newVertices[i[1]], self.newVertices[i[2]], data))
         
         for f in fragments:
             if shade:
                 self.fragmentShader(f, data)
-
             #depth test
             if self.depthBuffer[f.y][f.x] > f.depth : 
                 self.depthBuffer[f.y][f.x] = f.depth

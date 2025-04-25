@@ -1,0 +1,14 @@
+{
+  "useWebsocket": true,
+  "useUnsecureURL": false,
+  "hideInformations": false,
+  "dontRefreshInfos": false,
+  "protocol": "https",
+  "hostname": "moodle.caseine.org",
+  "path": "/webservice/rest/server.php",
+  "vplId": "729",
+  "personalToken": "45d4295f24c541ff42aaded9ae20ac3a",
+  "files": [
+    "Tools.java"
+  ]
+}
