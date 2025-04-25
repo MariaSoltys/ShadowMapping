@@ -18,5 +18,5 @@ This project is a Python-based software rasterizer that implements shadow mappin
 python main.py
 ```
 This will open two windows:
-    -One shows the shadow map (depth buffer from light's view)
-    -The other shows the final render result (with shadows applied)
+- One shows the shadow map (depth buffer from light's view)
+- The other shows the final render result (with shadows applied)
