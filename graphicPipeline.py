@@ -146,34 +146,29 @@ class GraphicPipeline:
         return fragments
     
 
-    
-    def fragmentShader(self,fragment,data):
+    def fragmentShader(self, fragment, data):
         N = fragment.interpolated_data[0:3]
-        N = N/np.linalg.norm(N)
+        N = N / np.linalg.norm(N)
         V = fragment.interpolated_data[3:6]
-        V = V/np.linalg.norm(V)
+        V = V / np.linalg.norm(V)
         L = fragment.interpolated_data[6:9]
-        L = L/np.linalg.norm(L)
+        L = L / np.linalg.norm(L)
 
-        R = 2 * np.dot(L,N) * N  -L
+        R = 2 * np.dot(L, N) * N - L
         ambient = 1.0
-        diffuse = max(np.dot(N,L),0)
-        specular = np.power(max(np.dot(R,V),0.0),64) 
+        diffuse = max(np.dot(N, L), 0)
+        specular = np.power(max(np.dot(R, V), 0.0), 64)
 
         ka = 0.1
         kd = 1.0
         ks = 0.5
         phong = ka * ambient + kd * diffuse + ks * specular
-        phong = np.ceil(phong*4 +1 )/6.0
+        phong = np.ceil(phong * 4 + 1) / 6.0
 
         texture = sample(data['texture'], fragment.interpolated_data[9], fragment.interpolated_data[10])
+        color = np.array([phong, phong, phong])
 
-
-        color = np.array([phong,phong,phong]) #* texture
-
-        
-        ####################################################################
-        # fragPos = data['cameraPosition'] - V  #since V = camera - fragment
+        # --- SHADOW ---
         fragPos = fragment.interpolated_data[11:14]
         vec = np.append(fragPos, 1.0).reshape((4, 1))
 
@@ -184,58 +179,34 @@ class GraphicPipeline:
         v = np.clip(light_space_pos[1, 0] * 0.5 + 0.5, 0, 1)
         shadow_depth = light_space_pos[2, 0] * 0.5 + 0.5
 
-
-        height, width = data['shadowMap'].shape
+        depthMap = data['shadowMap']
+        height, width = depthMap.shape
         x = int(u * width)
         y = int((1 - v) * height)
 
-        shadow = 0.0
-        bias = 0.0002
+        bias = 0.0005
 
+        # --- PCF filtering ---
+        shadow = 0
+        samples = 3
+        count = 0
+        for dy in range(-1, 2):
+            for dx in range(-1, 2):
+                sx = int(x + dx)
+                sy = int(y + dy)
+                if 0 <= sx < width and 0 <= sy < height:
+                    closest = depthMap[sy, sx]
+                    if shadow_depth - bias > closest:
+                        shadow += 1
+                    count += 1
+        shadow /= count
 
-
-        if 0 <= x < width and 0 <= y < height:
-            closest_depth = data['shadowMap'][y, x]
-            closest_depth = np.clip(closest_depth, 0.0, 1.0)
-            if shadow_depth - bias > closest_depth:
-                shadow = 1.0
-                print("cd: ", closest_depth)
-                print("sd: ", shadow_depth)
-            #shadow = 1.0
-
-
-        color *= (1.0 - 0.5*shadow)
-
-        #for debuging
-        if shadow > 0.0:
-            print("In shadow:", shadow)
-
-        # if 0 <= x < width and 0 <= y < height:
-        #     closest_depth = data['shadowMap'][y, x]
-        #     if shadow_depth - bias > closest_depth:
-        #         shadow = 1.0
-        #     if shadow > 0.0:
-        #         print(f"SHADOW! Frag: {shadow_depth:.5f}, Closest: {closest_depth:.5f}")
-        #     else:
-        #         print() #f"NO SHADOW! Frag: {shadow_depth:.5f}, Closest: {closest_depth:.5f}")
-        # else:
-        #     print(f"UV out of bounds: ({u:.2f}, {v:.2f})")
-
-
-
-        # if 0 <= x < width and 0 <= y < height:
-        #     closest_depth = data['shadowMap'][y, x]
-        #     print(f"Frag depth: {shadow_depth:.5f}, Closest: {closest_depth:.5f}")
-        #     if shadow_depth - bias > closest_depth:
-        #         shadow = 1.0
-
-        # print(f"Light-space UV: ({u:.2f}, {v:.2f}), Pixel: ({x}, {y})")
-        ####################################################################
+        color *= (1.0 - 0.5 * shadow)
         fragment.output = color
+
 
     def draw(self, vertices, triangles, data, shade=True):
         #Calling vertex shader
-        # self.newVertices = np.zeros((vertices.shape[0], 14))
         self.newVertices = np.zeros((vertices.shape[0], 17))
 
         for i in range(vertices.shape[0]) :
