@@ -52,16 +52,13 @@ lightProj = Projection(lightNearPlane, lightFarPlane, lightFov, aspectRatio)
 lightViewMatrix = lightCam.getMatrix()
 lightProjMatrix = lightProj.getMatrix()
 
-import os
-print("Current working directory:", os.getcwd())
-
 from readply import readply
 
-vertices, triangles = readply('tree.ply')
+vertices, triangles = readply('Scenes/tree.ply')
 
 from PIL import Image
 from numpy import asarray
-image = asarray(Image.open('terrain.jpg'))
+image = asarray(Image.open('Scenes/terrain.jpg'))
 
 
 data = dict([
