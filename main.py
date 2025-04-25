@@ -1,10 +1,10 @@
 import numpy as np
 
-# width = 1280  
-# height = 720
+width = 1280  
+height = 720
 
-width = 640
-height = 360
+# width = 640
+# height = 360
 
 import time
 start = time.time()
@@ -20,18 +20,25 @@ from camera import Camera
 from projection import Projection
 
 
-position = np.array([3.4, 2.0, 4.8])
-lookAt = np.array([-0.577, -0.577, -0.577])
+position = np.array([7, 3, 4.8])
+# lookAt = np.array([-0.577, -0.577, -0.577])
+#lookAt = np.array([-1.8, 0.4, -3.2])
+lookAt = np.array([-1.8, 0.4, -3.2])
+
 up = np.array([0.33333333,  0.33333333, -0.66666667])
 right = np.array([-0.57735027,  0.57735027,  0.])
 
-# position = np.array([9.65421, -6.32295, 6.14391])
+# position = np.array([6, -6.32295, 6.14391])
 # lookAt = np.array([-1.8, 0.4, -3.2])
 # up = np.array([0.5, 0.5, -0.9])
 # right = np.array([0.2, 1.8, -1.2])
 
+
+
+
 ################################################################################################# 1st chunck
 lightPosition = np.array([10, 0, 10])
+# lightPosition = np.array([10, , 10])
 lightLookAt = np.array([0, 0, 0])
 forward = lightLookAt - lightPosition
 forward = forward / np.linalg.norm(forward)
@@ -54,7 +61,7 @@ proj = Projection(nearPlane ,farPlane,fov, aspectRatio)
 
 ########################################################### 2nd chunck
 lightNearPlane = 0.1
-lightFarPlane = 50.0
+lightFarPlane = 20.0
 #fov = 1.91986
 lightFov = 1.047
 lightProj = Projection(lightNearPlane, lightFarPlane, lightFov, aspectRatio)
@@ -69,7 +76,7 @@ print("Current working directory:", os.getcwd())
 from readply import readply
 
 #vertices, triangles = readply('IWORKBUTTAKETIME.ply')
-vertices, triangles = readply('Scene4.ply')
+vertices, triangles = readply('Scene3.ply')
 
 # load and show an image with Pillow
 from PIL import Image
@@ -109,6 +116,8 @@ import matplotlib.pyplot as plt
 plt.imshow(shadowMap, cmap='gray')
 plt.title("Shadow Map from Light View")
 plt.show()
+
+print("Shadow map min/max:", np.min(shadowMap), np.max(shadowMap))
 ###################################################################
 
 pipeline.draw(vertices, triangles, data)
